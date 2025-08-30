@@ -2,7 +2,7 @@
 run AIport.py to run app, 
 this project can control your pc, 
 ALPHA VERSION, support other AI
-AI Agent Application
+AI Agent Application. 
 ​This is an automation tool that allows you to use AI models to control your computer.
 
 1. Connect to multiple AI APIs

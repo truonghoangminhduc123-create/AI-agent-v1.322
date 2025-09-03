@@ -5,7 +5,7 @@ import base64
 import requests
 import pyautogui
 import threading
-from tkinter import messagebox, scrolledtext, font
+from tkinter import messagebox, scrolledtext
 import tempfile
 from PIL import Image, ImageTk
 
@@ -37,40 +37,32 @@ class AIportGUI:
         self.stop_flag = False
         self.agent_thread = None
         self.last_screenshot_path = None
-        self.tutorial_content = None # New variable to store fetched tutorial
+        self.tutorial_content = None
 
         main_frame = ctk.CTkFrame(root, fg_color=ONEUI_COLORS["dark_bg"], corner_radius=10)
         main_frame.pack(fill="both", expand=True, padx=20, pady=20)
         
-        # Large, bold title for the main section, like One UI
         ctk.CTkLabel(main_frame, text="AI Agent Control", font=("Roboto", 24, "bold"), text_color=ONEUI_COLORS["text"]).pack(anchor="w", pady=(0, 20))
 
-        # 1. API Provider
         ctk.CTkLabel(main_frame, text="Select API:", font=("Roboto", 12, "bold"), text_color=ONEUI_COLORS["text"]).pack(anchor="w", pady=(0, 5))
         self.api_provider_combobox = ctk.CTkOptionMenu(main_frame, variable=self.api_provider, values=["Ollama", "Gemini", "OpenRouter", "OpenAI", "Claude"], command=self._on_api_change)
         self.api_provider_combobox.pack(fill="x", pady=(0, 15))
 
-        # 2. API Key
         ctk.CTkLabel(main_frame, text="API Key:", font=("Roboto", 12, "bold"), text_color=ONEUI_COLORS["text"]).pack(anchor="w", pady=(0, 5))
         self.api_key_entry = ctk.CTkEntry(main_frame, textvariable=self.api_key, placeholder_text="Enter your API key", show="*", fg_color=ONEUI_COLORS["widget_bg"])
         self.api_key_entry.pack(fill="x", pady=(0, 15))
 
-        # 3. Model
         ctk.CTkLabel(main_frame, text="Select AI Model:", font=("Roboto", 12, "bold"), text_color=ONEUI_COLORS["text"]).pack(anchor="w", pady=(0, 5))
         self.model_combobox = ctk.CTkOptionMenu(main_frame, variable=self.model, values=["llama3"])
         self.model_combobox.set("llama3")
         self.model_combobox.pack(fill="x", pady=(0, 15))
 
-        # 4. Prompt
         ctk.CTkLabel(main_frame, text="Enter command for AI:", font=("Roboto", 12, "bold"), text_color=ONEUI_COLORS["text"]).pack(anchor="w", pady=(0, 5))
         self.prompt_text = scrolledtext.ScrolledText(main_frame, height=8, wrap="word", font=("Roboto", 10),
                                                     bg=ONEUI_COLORS["widget_bg"], fg=ONEUI_COLORS["text"])
         self.prompt_text.pack(fill="x", pady=(0, 15))
         self.prompt_text.insert("1.0", "Find Chrome browser and open google.com")
         
-        # Removed the tutorial URL entry section as requested
-        
-        # 5. Buttons
         button_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
         button_frame.pack(pady=(0, 15), expand=True, fill="x")
         
@@ -83,7 +75,6 @@ class AIportGUI:
         self.view_image_button = ctk.CTkButton(button_frame, text="🖼️ View Screenshot", command=self.view_last_screenshot)
         self.view_image_button.pack(side="left", expand=True, padx=5)
 
-        # 6. Log/Output
         ctk.CTkLabel(main_frame, text="AI activity log:", font=("Roboto", 12, "bold"), text_color=ONEUI_COLORS["text"]).pack(anchor="w", pady=(0, 5))
         self.log_area = scrolledtext.ScrolledText(main_frame, height=15, wrap="word", state="disabled", font=("Roboto Mono", 10),
                                                 bg=ONEUI_COLORS["widget_bg"], fg=ONEUI_COLORS["text"])
@@ -107,13 +98,30 @@ class AIportGUI:
         elif choice == "Claude":
             self.model_combobox.configure(values=["claude-3-5-sonnet-20240620", "claude-3-opus-20240229", "claude-3-sonnet-20240229", "claude-3-haiku-20240307"])
             self.model_combobox.set("claude-3-5-sonnet-20240620")
-
-    def log(self, message):
+    
+    def _log_with_animation(self, message):
         self.log_area.configure(state="normal")
-        self.log_area.insert("end", message + "\n")
+        self._animate_text(message)
         self.log_area.configure(state="disabled")
-        self.log_area.see("end")
-        self.root.update_idletasks()
+
+    def _animate_text(self, text, index=0):
+        if index < len(text):
+            char = text[index]
+            self.log_area.insert("end", char)
+            self._smooth_scroll_down()
+            self.root.after(1, self._animate_text, text, index + 1)
+        elif index == len(text):
+            self.log_area.insert("end", "\n")
+            self._smooth_scroll_down()
+
+    def _smooth_scroll_down(self):
+        end_position = self.log_area.yview()[1]
+        if end_position < 1.0:
+            self.log_area.yview_scroll(1, "units")
+            self.root.after(5, self._smooth_scroll_down)
+        else:
+            self.log_area.yview_scroll(10, "units") # Hard jump to ensure it is at the very end
+            self.log_area.update_idletasks()
 
     def start_agent(self):
         if not self.api_key.get() and self.api_provider.get() != "Ollama":
@@ -135,26 +143,24 @@ class AIportGUI:
 
     def stop_agent(self):
         self.stop_flag = True
-        self.log("⏹️ Sending stop signal to AI...")
+        self._log_with_animation("⏹️ Sending stop signal to AI...")
         self.start_button.configure(state="normal")
         self.stop_button.configure(state="disabled")
     
-    # Removed the load_tutorial method as requested
-
     def _encode_image(self, filename):
         with open(filename, "rb") as f:
             return base64.b64encode(f.read()).decode("utf-8")
 
     def _fetch_tutorial(self):
-        self.log("🔗 Loading tutorial from GitHub URL...")
+        self._log_with_animation("🔗 Loading tutorial from GitHub URL...")
         url = "https://raw.githubusercontent.com/truonghoangminhduc123-create/Training-data/refs/heads/main/Trainingdata.txt"
         try:
             response = requests.get(url)
             response.raise_for_status()
             self.tutorial_content = response.text
-            self.log("✅ Tutorial loaded successfully!")
+            self._log_with_animation("✅ Tutorial loaded successfully!")
         except requests.exceptions.RequestException as e:
-            self.log(f"❌ Error loading tutorial: {e}")
+            self._log_with_animation(f"❌ Error loading tutorial: {e}")
             messagebox.showerror("Error", f"Failed to load tutorial from URL.\nError: {e}")
             self.stop_agent()
 
@@ -163,25 +169,20 @@ class AIportGUI:
         url = "http://localhost:11434/api/generate"
         headers = {"Content-Type": "application/json"}
         
-        # Ollama expects a list of messages. The last message can contain the image.
         payload = {
             "model": model,
             "prompt": f"{self.tutorial_content}\n\n{user_prompt}",
             "stream": False,
             "images": [img_b64],
             "options": {
-                "num_ctx": 4096 # Set a context size, if needed
+                "num_ctx": 4096
             }
         }
         
         res = requests.post(url, headers=headers, data=json.dumps(payload))
         res.raise_for_status()
-        
-        # The Ollama response is a stream of JSON objects, but if stream is False, it's a single JSON object.
-        # We need to parse the JSON and get the 'response' field
         response_data = res.json()
         return response_data.get("response", "")
-
 
     def _send_to_gemini(self, img_b64, user_prompt):
         api_key = self.api_key.get()
@@ -269,11 +270,10 @@ class AIportGUI:
         res.raise_for_status()
         return res.json()["content"][0]["text"]
 
-
     def _execute_actions(self, actions):
         for action in actions:
             t = action.get("type")
-            self.log(f"   - Executing: {t} with {action}")
+            self._log_with_animation(f"   - Executing: {t} with {action}")
             if t == "move":
                 pyautogui.moveTo(action["x"], action["y"], duration=0.5)
             elif t == "click":
@@ -297,7 +297,7 @@ class AIportGUI:
                 duration = action.get("duration", 1.0)
                 if key:
                     pyautogui.keyDown(key)
-                    self.log(f"   - Holding key: {key} for {duration} seconds")
+                    self._log_with_animation(f"   - Holding key: {key} for {duration} seconds")
                     time.sleep(duration)
                     pyautogui.keyUp(key)
             time.sleep(0.5)
@@ -323,13 +323,12 @@ class AIportGUI:
         close_button.pack(pady=10)
 
     def _run_agent_loop(self):
-        self.log("▶️ AI agent starting...")
+        self._log_with_animation("▶️ AI agent starting...")
         user_prompt = self.prompt_text.get("1.0", "end").strip()
         
-        # Fetch tutorial content once at the beginning
         self._fetch_tutorial()
         if not self.tutorial_content:
-            self.log("❌ Failed to load tutorial. Stopping agent.")
+            self._log_with_animation("❌ Failed to load tutorial. Stopping agent.")
             self.stop_agent()
             return
 
@@ -342,12 +341,12 @@ class AIportGUI:
             try:
                 self.last_screenshot_path = os.path.join(temp_dir, f"screenshot_{int(time.time())}.png")
 
-                self.log(f"\n[1] Taking new screenshot: {self.last_screenshot_path}")
+                self._log_with_animation(f"\n[1] Taking new screenshot: {self.last_screenshot_path}")
                 pyautogui.screenshot(self.last_screenshot_path)
                 
                 img_b64 = self._encode_image(self.last_screenshot_path)
 
-                self.log("[2] Sending image and command to AI...")
+                self._log_with_animation("[2] Sending image and command to AI...")
 
                 api_provider = self.api_provider.get()
                 if api_provider == "Ollama":
@@ -361,38 +360,38 @@ class AIportGUI:
                 elif api_provider == "Claude":
                     response_text = self._send_to_claude(img_b64, user_prompt)
                 else:
-                    self.log("❌ Error: Unsupported API Provider.")
+                    self._log_with_animation("❌ Error: Unsupported API Provider.")
                     break
                 
-                self.log("[3] AI response:\n" + response_text)
+                self._log_with_animation("[3] AI response:\n" + response_text)
 
                 try:
                     clean_ai_text = response_text.strip().replace("```json", "").replace("```", "")
                     actions = json.loads(clean_ai_text)
                     
                     if not actions:
-                        self.log("✅ AI thinks the task is complete. Stopping.")
+                        self._log_with_animation("✅ AI thinks the task is complete. Stopping.")
                         break
 
-                    self.log("[4] Executing actions:")
+                    self._log_with_animation("[4] Executing actions:")
                     self._execute_actions(actions)
                 except Exception as e:
-                    self.log(f"❌ Error parsing JSON or executing: {e}")
+                    self._log_with_animation(f"❌ Error parsing JSON or executing: {e}")
 
                 time.sleep(2)
 
             except Exception as e:
-                self.log(f"❌ Error in main loop: {e}")
+                self._log_with_animation(f"❌ Error in main loop: {e}")
                 if "API_KEY_INVALID" in str(e) or "AuthenticationError" in str(e):
-                    self.log("ERROR: Invalid API Key. Please check again.")
+                    self._log_with_animation("ERROR: Invalid API Key. Please check again.")
                 elif "404" in str(e):
-                    self.log("ERROR: API path not found. You might have selected a model that doesn't support screenshots.")
-                    self.log("Please try again with a different model, for example 'gpt-4o'.")
+                    self._log_with_animation("ERROR: API path not found. You might have selected a model that doesn't support screenshots.")
+                    self._log_with_animation("Please try again with a different model, for example 'gpt-4o'.")
                 break
                 time.sleep(2)
         
         if self.stop_flag:
-             self.log("⏹️ AI stopped by user.")
+             self._log_with_animation("⏹️ AI stopped by user.")
         self.stop_agent()
         self._cleanup_temp_files()
 
@@ -404,10 +403,11 @@ class AIportGUI:
                 try:
                     os.remove(file_path)
                 except OSError as e:
-                    self.log(f"Error deleting temporary file {file_path}: {e}")
+                    self._log_with_animation(f"Error deleting temporary file {file_path}: {e}")
 
 # ================== RUN ==================
 if __name__ == "__main__":
     root = ctk.CTk()
     app = AIportGUI(root)
     root.mainloop()
+
